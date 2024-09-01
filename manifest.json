@@ -1,0 +1,20 @@
+{
+    "manifest_version": 2,
+    "name": "Teamly Formulas",
+    "description": "Formulas for tables in teamly",
+    "version": "0.3",
+    "action": {
+      "default_popup": "app.html",
+      "default_icon": "icon.png"
+    },
+    "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
+    "content_scripts": [
+    {
+      "js": ["app.js"],
+      "matches": [
+        "https://*.teamly.ru/*",
+        "https://developer.chrome.com/docs/webstore/*"
+      ]
+    }
+  ]
+  }
