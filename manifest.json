@@ -13,6 +13,7 @@
       "js": ["app.js"],
       "matches": [
         "https://*.teamly.ru/*",
+        "https://teamly.*",
         "https://developer.chrome.com/docs/webstore/*"
       ]
     }
