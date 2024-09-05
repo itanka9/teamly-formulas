@@ -5,6 +5,7 @@ const CSS_PREFIX = 'tfe';
 const tables = new Map();
 const fields = new Map();
 const filterPopovers = new Map();
+const articleProperties = new Map();
 
 function mainLoop() {
     const currTables = document.querySelectorAll('.database-table');
@@ -13,6 +14,7 @@ function mainLoop() {
         if (tables.has(t)) {
             return;
         }
+        console.log('prepare table');
         tables.set(t, prepareTable(t));        
     });
 
@@ -21,6 +23,7 @@ function mainLoop() {
         if (fields.has(f)) {
             return;
         }
+        console.log('prepare fields');
         fields.set(f, prepareFields(f));        
     });
 
@@ -29,8 +32,28 @@ function mainLoop() {
         if (filterPopovers.has(p)) {
             return;
         }
+        console.log('prepare popover');
         filterPopovers.set(p, prepareFilterPopover(p));
     })
+
+    let currArticleProperties = document.querySelectorAll('.article-properties');
+    currArticleProperties.forEach(ap => {
+        const hasList = ap.querySelector('.properties-list');
+        if (!hasList) {
+            const toggleButton = document.querySelector('.article-properties__toggle');
+            if (toggleButton) {
+                toggleButton.click();
+            }    
+        }
+        if (articleProperties.has(ap)) {
+            return;
+        }
+        console.log('prepare article props');
+        articleProperties.set(ap, prepareArticleProperties(ap));
+    });
+    // if (tempExpanded && toggleButton) {
+    //     toggleButton.click();
+    // }
 
     tables.forEach(({
         table,
@@ -196,6 +219,46 @@ function prepareFilterPopover(popover) {
     installFilterField(popover, popover, '.list__item');
     return {
         popover
+    }
+}
+
+
+function prepareArticleProperties (articleProperties) {
+    const root = document.createElement('div');
+    root.innerHTML = `
+        <div class="properties-list ${CSS_PREFIX}-visible-props"></div>
+        <button style="font-size: 12px; color: #ccc; margin-left: 32px;">Показать остальные свойства...</button>
+        <div class="properties-list ${CSS_PREFIX}-etc-props" style="display: none;"></div>
+    `;
+    const visibleProps = root.querySelector(`.${CSS_PREFIX}-visible-props`);
+    const etcProps = root.querySelector(`.${CSS_PREFIX}-etc-props`);
+
+    const moreButton = root.querySelector('button');
+
+    articleProperties.querySelectorAll('.properties-item').forEach(item => {
+        const text = item.querySelector('.properties-item__label-text').innerText;
+        const isEmpty = item.querySelector('.cell-empty') || item.querySelector('.database-checkbox');
+        const forceShow = text.indexOf('#show') !== -1;
+        if (!isEmpty || forceShow) {
+            visibleProps.appendChild(item);
+        } else {
+            etcProps.appendChild(item);
+        }
+    });
+
+    let etcPropsVisible = false;
+    moreButton.addEventListener('click', () => {
+        etcPropsVisible = !etcPropsVisible;
+        etcProps.style.display = etcPropsVisible ? 'block' : 'none';
+        moreButton.innerText = etcPropsVisible ? 'Скрыть остальные свойства...' :'Показать остальные свойства...';
+    })
+
+    articleProperties.parentElement.insertBefore(root, articleProperties);
+    articleProperties.style.display = 'none';
+
+    return {
+        root,
+        articleProperties
     }
 }
 
