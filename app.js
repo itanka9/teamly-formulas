@@ -1,7 +1,10 @@
 setInterval(mainLoop, 500);
 
+const CSS_PREFIX = 'tfe';
+
 const tables = new Map();
 const fields = new Map();
+const filterPopovers = new Map();
 
 function mainLoop() {
     const currTables = document.querySelectorAll('.database-table');
@@ -20,6 +23,14 @@ function mainLoop() {
         }
         fields.set(f, prepareFields(f));        
     });
+
+    const currPopovers = document.querySelectorAll('.add-filter__popover');
+    currPopovers.forEach(p => {
+        if (filterPopovers.has(p)) {
+            return;
+        }
+        filterPopovers.set(p, prepareFilterPopover(p));
+    })
 
     tables.forEach(({
         table,
@@ -147,56 +158,44 @@ function prepareFields(fieldsEl) {
     root.style.display = 'flex';
     root.style.alignItems = 'center';
     root.style.paddingRight = '16px';
-    root.innerHTML = `<input class="tfe-filter" style="margin: 0 16px;border: solid 1px #eee; padding: 2px; border-radius: 2px; font-size: 12px;" placeholder="Фильтр..." type="text">
-        <span style="flex-grow: 1;"></span>
-        <button class="tfe-toggle-all">Скрыть все</button>
+    root.innerHTML = `<span style="flex-grow: 1;"></span>
+        <button class="tfe-toggle-all" style="font-size: 12px; padding: 2px; border: solid 1px #eee; border-radius: 2px; white-space: nowrap;">Скрыть все</button>
     `;
 
+    installFilterField(root, fieldsEl, '.visible-fields-item');
+
     const toggleButton = root.querySelector('.tfe-toggle-all');
-    let showAll = true;
+    const shown = fieldsEl.querySelectorAll('.visible-fields__shown .visible-fields-item').length;
+    const hidden = fieldsEl.querySelectorAll('.visible-fields__hidden .visible-fields-item').length;
+
+    let showAll = shown > hidden;
+    toggleButton.innerText = showAll ? 'Скрыть все' : 'Показать все';
     toggleButton.addEventListener('click', () => {
         showAll = !showAll;
         let values = [];
         if (showAll) {
             values = Array.from(fieldsEl
                 .querySelectorAll('.visible-fields-item'))
-                .map(div => div.getAttribute('id')
-                .filter(x => x !== 'title'));
+                .map(div => div.getAttribute('id'))
+                .filter(x => x !== 'title');
         }
-        toggleButton.innerText = showAll ? 'Скрыть все' : 'Показат все';
+        toggleButton.innerText = showAll ? 'Скрыть все' : 'Показать все';
         apiUpdateVisibility(values).then(() => {
-            console.log('call ok');
             location.reload();
         })
     });
 
-    const filterEl = root.querySelector('.tfe-filter');
-    filterEl.addEventListener('input', ev => {
-        setFilter(ev.target.value);
-    })
-    // filterEl.addEventListener('blur', () => {
-    //     setTimeout(() => {
-    //         setFilter(null);
-    //     })
-    // });
-
     titleEl.appendChild(root);
-    filterEl.focus();
-
-    function setFilter(str) {
-        if (str) {
-            str = str.toLowerCase();
-        }
-        fieldsEl
-            .querySelectorAll('.visible-fields-item')
-            .forEach(item => {
-                const match = !str || (item.innerText ?? '').toLowerCase().indexOf(str) !== -1;
-                item.style.display = match ? 'flex' : 'none';
-            })
-    }
 
     return {
         titleEl
+    }
+}
+
+function prepareFilterPopover(popover) {
+    installFilterField(popover, popover, '.list__item');
+    return {
+        popover
     }
 }
 
@@ -257,4 +256,28 @@ function apiUpdateVisibility (values) {
             "internal": false
         })
     })
+}
+
+function installFilterField(filterContainer, rootContainer, itemSelector) {
+    const el = document.createElement('div');
+    el.innerHTML = `<input class="${CSS_PREFIX}-filter" style="margin: 0 16px;border: solid 1px #eee; padding: 2px; border-radius: 2px; font-size: 12px;" placeholder="Фильтр..." type="text"></input>`;
+    filterContainer.insertBefore(el.firstChild, filterContainer.firstChild);
+
+    const filterEl = filterContainer.querySelector(`.${CSS_PREFIX}-filter`);
+    filterEl.addEventListener('input', ev => {
+        setFilter(ev.target.value);
+    });
+    filterEl.focus();
+
+    function setFilter(str) {
+        if (str) {
+            str = str.toLowerCase();
+        }
+        rootContainer
+            .querySelectorAll(itemSelector)
+            .forEach(item => {
+                const match = !str || (item.innerText ?? '').toLowerCase().indexOf(str) !== -1;
+                item.style.display = match ? 'flex' : 'none';
+            })
+    }
 }
