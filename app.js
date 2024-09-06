@@ -27,7 +27,7 @@ function mainLoop() {
         fields.set(f, prepareFields(f));        
     });
 
-    const currPopovers = document.querySelectorAll('.add-filter__popover');
+    const currPopovers = document.querySelectorAll('.add-filter__popover, .filter-sort-content__action-popover');
     currPopovers.forEach(p => {
         if (filterPopovers.has(p)) {
             return;
@@ -90,7 +90,7 @@ function mainLoop() {
         }
 
 
-        formulas.forEach(({ header, title, col, formula, headerOnly }) => {
+        formulas.forEach(({ header, title, col, formula, hasSum, headerOnly }) => {
             let sum = 0;
             for (let row = 0; row < rows.length; row++) {
                 const cell = cells[row][col];
@@ -115,7 +115,7 @@ function mainLoop() {
                     cell.innerText = '#ERR'
                 }
             }
-            header.innerText = `${title.replace(/#SUM#/, sum)}`;
+            header.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum + ')' : ''}`;
         });
     });
 }
@@ -137,7 +137,8 @@ function prepareTable (table) {
     for (const header of headers) {
         const text = header.innerText ?? '';
         const m = text.match(/\(\(\=(.*)\)\)/);
-        const hasSum = text.match(/#SUM#/);
+        const firstRowCell = cells[0][col];
+        const hasSum = text.match(/#SUM#/) || firstRowCell?.classList.contains('database-number');
         const preciseHeader = header.children[0] instanceof HTMLElement ? header.children[0] : header; 
         if (m && m[1]) {
             const formula = m[1].trim().replace(/\[/g, 'value(row, "').replace(/\]/g, '")');
