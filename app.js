@@ -40,7 +40,7 @@ function mainLoop() {
     currArticleProperties.forEach(ap => {
         const hasList = ap.querySelector('.properties-list');
         if (!hasList) {
-            const toggleButton = document.querySelector('.article-properties__toggle');
+            const toggleButton = ap.querySelector('.article-properties__toggle');
             if (toggleButton) {
                 toggleButton.click();
             }    
@@ -196,14 +196,14 @@ function prepareFields(fieldsEl) {
     toggleButton.innerText = showAll ? 'Скрыть все' : 'Показать все';
     toggleButton.addEventListener('click', () => {
         showAll = !showAll;
-        let values = [];
+        let values = ['title'];
         if (showAll) {
             values = Array.from(fieldsEl
                 .querySelectorAll('.visible-fields-item'))
-                .map(div => div.getAttribute('id'))
-                .filter(x => x !== 'title');
+                .map(div => div.getAttribute('id'));
+
+            values.unshift('title');
         }
-        toggleButton.innerText = showAll ? 'Скрыть все' : 'Показать все';
         apiUpdateVisibility(values).then(() => {
             location.reload();
         })
@@ -255,7 +255,13 @@ function prepareArticleProperties (articleProperties) {
     })
 
     articleProperties.parentElement.insertBefore(root, articleProperties);
-    articleProperties.style.display = 'none';
+    if (articleProperties.parentElement.classList.contains('editor__aside-wrapper')) {
+        articleProperties.parentElement.style.flexDirection = 'column';
+    }
+    const toggleButton = articleProperties.querySelector('.article-properties__toggle');
+    if (toggleButton) {
+       toggleButton.style.display = 'none'; 
+    }
 
     return {
         root,
@@ -263,12 +269,35 @@ function prepareArticleProperties (articleProperties) {
     }
 }
 
-function getSpaceView() {
+async function getSpaceView() {
     try {
         const parts =  location.pathname.split('/');
         const dbIndex = parts.findIndex(x => x === 'database');
         const spaceId = parts[dbIndex + 1];
-        const viewId = new URL(location.href).searchParams.get('viewId');
+        let viewId = new URL(location.href).searchParams.get('viewId');
+
+        if (!viewId) {
+            const result = await fetch(`https://teamly.2gis.one/api/v1/ql/spaces/${spaceId}/display-views`, {
+                method: 'post',
+                credentials: "include",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Account-Slug': 'default'
+                },
+                body: JSON.stringify({
+                    query: {
+                        "__pagination": {
+                            "page": 1,
+                            "perPage": 50
+                        },
+                        "id": true,
+                        "spaceId": true,    
+                    }
+                })
+            }).then(r => r.json());
+            viewId = result.items[0].id;
+        }
         
         if (typeof spaceId === 'string' && typeof viewId === 'string') {
             return { spaceId, viewId }
@@ -281,8 +310,8 @@ function getSpaceView() {
     }
 }
 
-function apiUpdateVisibility (values) {
-    const { spaceId, viewId } = getSpaceView();
+async function apiUpdateVisibility (values) {
+    const { spaceId, viewId } = await getSpaceView();
     if (!spaceId) {
         console.error('Failed to obtain credentials');
         return;
