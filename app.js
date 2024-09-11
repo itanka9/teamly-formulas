@@ -77,7 +77,9 @@ function mainLoop() {
             if (checkbox) {
                 return checkbox.querySelector('.checked') ? 1 : 0;
             } else  {
-                const v = (cells[row][col].innerText ?? '').replace(/\s+/g, '');
+                const v = (cells[row][col].innerText ?? '')
+                    .replace(/\s+/g, '')
+                    .replace(',', '.');
                 if (isNaN(v)) {
                     return v;
                 }
