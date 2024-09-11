@@ -7,6 +7,16 @@ const fields = new Map();
 const filterPopovers = new Map();
 const articleProperties = new Map();
 
+/**
+ * Основной цикл. Каждый интервал времени проверяем страницу на наличиее 
+ * интересующих нас селекторов и "дорабатываем" интересующие нас части:
+ * 1) Таблицы со значениями - в них мы начинаем обсчитывать формулы
+ * 2) Диалоги настройки свойств - туда мы добавляем поле с фильтром и кнопку "Скрыть все / Показать все"
+ * 3) Панельку со свойтсвами брифа/документа - в ней мы показываем только непустые свойства или те, у 
+ * которых в названии прописано #show.
+ * 
+ * Второе чем занимается основной цикл - это собственно пересчет формул в таблицах.
+ */
 function mainLoop() {
     const currTables = document.querySelectorAll('.database-table');
 
@@ -100,6 +110,14 @@ function mainLoop() {
                     continue;
                 }
                 try {
+                    /**
+                     * При инициализации таблицы формула при помощи
+                     * простейших манипуляций конвертируется в JS-выражение.
+                     * 
+                     * Тут мы его просто вычисляем. 
+                     * 
+                     * Использование eval() - это всегда грязь, но зато быстро 
+                     */
                     const result = eval(formula);
                     if (!isNaN(result)) {
                         sum += Number(result);
@@ -143,6 +161,7 @@ function prepareTable (table) {
         const hasSum = text.match(/#SUM#/) || firstRowCell?.classList.contains('database-number');
         const preciseHeader = header.children[0] instanceof HTMLElement ? header.children[0] : header; 
         if (m && m[1]) {
+            // Этой штукой мы конветим формулу в JS-выражение.
             const formula = m[1].trim().replace(/\[/g, 'value(row, "').replace(/\]/g, '")');
             formulas.push({
                 header: preciseHeader,
