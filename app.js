@@ -118,9 +118,10 @@ function mainLoop() {
                      * 
                      * Использование eval() - это всегда грязь, но зато быстро 
                      */
-                    const result = eval(formula);
+                    let result = eval(formula);
                     if (!isNaN(result)) {
                         sum += Number(result);
+                        result = result.toFixed(2).replace('.00', '');
                     }
                     if (headerOnly) {
                         continue;
@@ -135,7 +136,7 @@ function mainLoop() {
                     cell.innerText = '#ERR'
                 }
             }
-            header.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum + ')' : ''}`;
+            header.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum.toFixed(2).replace('.00', '') + ')' : ''}`;
         });
     });
 }
@@ -293,12 +294,13 @@ function prepareArticleProperties (articleProperties) {
 async function getSpaceView() {
     try {
         const parts =  location.pathname.split('/');
-        const dbIndex = parts.findIndex(x => x === 'database');
-        const spaceId = parts[dbIndex + 1];
+        const dbIndex = parts.findIndex(x => x === 'database' || x === 'article');
+        const slug = parts[dbIndex] === 'article' ? 'articles' : 'spaces'; 
+        let spaceId = parts[dbIndex + 1];
         let viewId = new URL(location.href).searchParams.get('viewId');
 
         if (!viewId) {
-            const result = await fetch(`https://teamly.2gis.one/api/v1/ql/spaces/${spaceId}/display-views`, {
+            const result = await fetch(`https://teamly.2gis.one/api/v1/ql/${slug}/${spaceId}/display-views`, {
                 method: 'post',
                 credentials: "include",
                 headers: {
@@ -317,7 +319,9 @@ async function getSpaceView() {
                     }
                 })
             }).then(r => r.json());
+            console.log(JSON.stringify(result));
             viewId = result.items[0].id;
+            spaceId = result.items[0].spaceId;
         }
         
         if (typeof spaceId === 'string' && typeof viewId === 'string') {
