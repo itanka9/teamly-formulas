@@ -75,6 +75,9 @@ function mainLoop() {
     
             function valueRc(row, col) {
                 const cell = cells[row][col];
+                if (!cell) {
+                    return NaN;
+                }
                 const checkbox = cell.querySelector('.checkbox');
                 if (checkbox) {
                     return checkbox.querySelector('.checked') ? 1 : 0;
@@ -140,11 +143,7 @@ function prepareTable (table) {
 
     const formulas = [];
     let column = 0;
-    const headerByName = {};
-    for (let i = 0; i < headers.length; i++) {
-        const name = (headers[i].innerText ?? '').toLowerCase();
-        headerByName[name] = i;
-    }
+    const headerNames = headers.map(h => (h.innerText ?? '').trim().toLowerCase());
     for (const header of headers) {
         const text = header.innerText ?? '';
         const m = text.match(/\(\(\=(.*)\)\)/);
@@ -154,7 +153,8 @@ function prepareTable (table) {
         if (m && m[1]) {
             // Этой штукой мы конветим формулу в JS-выражение.
             const formula = m[1].trim().replace(/\[(.*?)\]/g, function (_, name) {
-                const i = headerByName[name.toLowerCase()];
+                name = name.trim().toLowerCase();
+                const i = headerNames.findIndex(hname => (hname ?? '').startsWith(name));
                 return `valueRc(row, ${i})`;
             });
             formulas.push({
@@ -310,7 +310,6 @@ async function getSpaceView() {
                     }
                 })
             }).then(r => r.json());
-            console.log(JSON.stringify(result));
             viewId = result.items[0].id;
             spaceId = result.items[0].spaceId;
         }
