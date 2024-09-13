@@ -126,9 +126,12 @@ function mainLoop() {
                         cell.innerText = '#ERR'
                     }
                 }
-                const preciseHeader = headers[col].children[0] instanceof HTMLElement ? headers[col].children[0] : headers[col]; 
+                const header = headers[col];
+                if (header) {
+                    const preciseHeader = header.children[0] instanceof HTMLElement ? header.children[0] : header; 
 
-                preciseHeader.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum.toFixed(2).replace('.00', '') + ')' : ''}`;
+                    preciseHeader.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum.toFixed(2).replace('.00', '') + ')' : ''}`;    
+                }
             });    
         })
     });
