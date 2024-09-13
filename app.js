@@ -61,113 +61,106 @@ function mainLoop() {
         console.log('prepare article props');
         articleProperties.set(ap, prepareArticleProperties(ap));
     });
-    // if (tempExpanded && toggleButton) {
-    //     toggleButton.click();
-    // }
 
     tables.forEach(({
         table,
         headers,
-        rows,
-        cells,
         formulas
     }) => {
 
-        function value(row, name) {
-            const headerIndex = headers.findIndex(h => (h.innerText ?? '').indexOf(name) !== -1);
-            if (headerIndex === -1) {
-                return null;
-            }
-            return valueRc(row, headerIndex);
-        }
-
-        function valueRc(row, col) {
-            const cell = cells[row][col];
-            const checkbox = cell.querySelector('.checkbox');
-            if (checkbox) {
-                return checkbox.querySelector('.checked') ? 1 : 0;
-            } else  {
-                const v = (cells[row][col].innerText ?? '')
-                    .replace(/\s+/g, '')
-                    .replace(',', '.');
-                if (isNaN(v)) {
-                    return v;
-                }
-                return Number(v);
-            }
-        }
-
-        if (formulas.length === 0) {
-            return;
-        }
-
-
-        formulas.forEach(({ header, title, col, formula, hasSum, headerOnly }) => {
-            let sum = 0;
-            for (let row = 0; row < rows.length; row++) {
+        table.querySelectorAll('.table-content').forEach(tableContent => {
+            const headers = Array.from(tableContent.querySelectorAll('.header-column'));
+            const rows = Array.from(tableContent.querySelectorAll('.row'));
+            const cells = Array.from(rows).map(row => Array.from(row.querySelectorAll('.table-cell')));
+    
+            function valueRc(row, col) {
                 const cell = cells[row][col];
-                if (!cell) {
-                    continue;
-                }
-                try {
-                    /**
-                     * При инициализации таблицы формула при помощи
-                     * простейших манипуляций конвертируется в JS-выражение.
-                     * 
-                     * Тут мы его просто вычисляем. 
-                     * 
-                     * Использование eval() - это всегда грязь, но зато быстро 
-                     */
-                    let result = eval(formula);
-                    if (!isNaN(result)) {
-                        sum += Number(result);
-                        result = result.toFixed(2).replace('.00', '');
+                const checkbox = cell.querySelector('.checkbox');
+                if (checkbox) {
+                    return checkbox.querySelector('.checked') ? 1 : 0;
+                } else  {
+                    const v = (cells[row][col].innerText ?? '')
+                        .replace(/\s+/g, '')
+                        .replace(',', '.');
+                    if (isNaN(v)) {
+                        return v;
                     }
-                    if (headerOnly) {
+                    return Number(v);
+                }
+            }
+
+            formulas.forEach(({ title, col, formula, hasSum, headerOnly }) => {
+                let sum = 0;
+                for (let row = 0; row < rows.length; row++) {
+                    const cell = cells[row][col];
+                    if (!cell) {
                         continue;
                     }
-                    if (result === undefined) {
-                        cell.innerText = '-'
-                    } else {
-                        cell.innerText = result;
+                    try {
+                        /**
+                         * При инициализации таблицы формула при помощи
+                         * простейших манипуляций конвертируется в JS-выражение.
+                         * 
+                         * Тут мы его просто вычисляем. 
+                         * 
+                         * Использование eval() - это всегда грязь, но зато быстро 
+                         */
+                        let result = eval(formula);
+                        if (!isNaN(result)) {
+                            sum += Number(result);
+                            result = result.toFixed(2).replace('.00', '');
+                        }
+                        if (headerOnly) {
+                            continue;
+                        }
+                        if (result === undefined) {
+                            cell.innerText = '-'
+                        } else {
+                            cell.innerText = result;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        cell.innerText = '#ERR'
                     }
-                } catch (e) {
-                    console.error(e);
-                    cell.innerText = '#ERR'
                 }
-            }
-            header.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum.toFixed(2).replace('.00', '') + ')' : ''}`;
-        });
+                const preciseHeader = headers[col].children[0] instanceof HTMLElement ? headers[col].children[0] : headers[col]; 
+
+                preciseHeader.innerText = `${title.replace(/#(\w+)#?/, '').replace(/\(\)/g, '')} ${hasSum ? '(' + sum.toFixed(2).replace('.00', '') + ')' : ''}`;
+            });    
+        })
     });
 }
 
 function prepareTable (table) {
-    table.addEventListener('blur', (ev) => {
-        console.log('blur', ev, ev.target);
-    });
-    table.addEventListener('click', (ev) => {
-        console.log('click', ev, ev.target);
-    });
+    const firstHeader = table.querySelector('.table-header');
+    const firstRow = table.querySelector('.row');
+    const firstRowCells = Array.from(firstRow.querySelectorAll('.table-cell'));
 
-    const rows = table.querySelectorAll('.table-content__row');
-    const cells = Array.from(rows).map(row => Array.from(row.querySelectorAll('.table-cell')));
-    const headers = Array.from(table.querySelectorAll('.header-column'));
+    const headers = Array.from(firstHeader.querySelectorAll('.header-column'));
 
     const formulas = [];
-    let col = 0;
+    let column = 0;
+    const headerByName = {};
+    for (let i = 0; i < headers.length; i++) {
+        const name = (headers[i].innerText ?? '').toLowerCase();
+        headerByName[name] = i;
+    }
     for (const header of headers) {
         const text = header.innerText ?? '';
         const m = text.match(/\(\(\=(.*)\)\)/);
-        const firstRowCell = cells[0][col];
+        const firstRowCell = firstRowCells[column];
         const hasSum = text.match(/#SUM#/) || firstRowCell?.classList.contains('database-number');
         const preciseHeader = header.children[0] instanceof HTMLElement ? header.children[0] : header; 
         if (m && m[1]) {
             // Этой штукой мы конветим формулу в JS-выражение.
-            const formula = m[1].trim().replace(/\[/g, 'value(row, "').replace(/\]/g, '")');
+            const formula = m[1].trim().replace(/\[(.*?)\]/g, function (_, name) {
+                const i = headerByName[name.toLowerCase()];
+                return `valueRc(row, ${i})`;
+            });
             formulas.push({
                 header: preciseHeader,
                 title: text.slice(0, m.index),
-                col,
+                col: column,
                 formula,
                 hasSum
             });
@@ -175,20 +168,18 @@ function prepareTable (table) {
             formulas.push({
                 header: preciseHeader,
                 title: text,
-                col,
-                formula: `valueRc(row, ${col})`,
+                col: column,
+                formula: `valueRc(row, ${column})`,
                 hasSum,
                 headerOnly: true
             });
         }
-        col += 1;
+        column += 1;
     }
 
     return {
         table,
         headers,
-        rows,
-        cells,
         formulas
     };
 }
@@ -357,12 +348,6 @@ async function apiUpdateVisibility (values) {
                     viewId
                 },
                 "settingsOperations": [
-                    // {
-                    //     "path": "__layout",
-                    //     "method": "update",
-                    //     "code": "propertySort",
-                    //     "value": values
-                    // },
                     {
                         "path": "__displayProperties",
                         "method": "update",
