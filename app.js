@@ -68,12 +68,23 @@ function mainLoop() {
         formulas
     }) => {
 
+        const firstHeader = table.querySelector('.table-header');
+        if (!firstHeader) {
+            return;
+        }
+        const columnMap = {};
+        const firstHeaders = firstHeader.querySelectorAll('.header-column');
+        firstHeaders.forEach((h, i) => {
+            columnMap[h.dataset.col] = i;
+        });
+
         table.querySelectorAll('.table-content').forEach(tableContent => {
             const headers = Array.from(tableContent.querySelectorAll('.header-column'));
             const rows = Array.from(tableContent.querySelectorAll('.row'));
             const cells = Array.from(rows).map(row => Array.from(row.querySelectorAll('.table-cell')));
     
-            function valueRc(row, col) {
+            function valueRc(row, rawCol) {
+                const col = columnMap[rawCol];
                 const cell = cells[row][col];
                 if (!cell) {
                     return NaN;
@@ -93,6 +104,7 @@ function mainLoop() {
             }
 
             formulas.forEach(({ title, col, formula, hasSum, headerOnly }) => {
+                col = columnMap[col];
                 let sum = 0;
                 for (let row = 0; row < rows.length; row++) {
                     const cell = cells[row][col];
@@ -146,7 +158,14 @@ function prepareTable (table) {
 
     const formulas = [];
     let column = 0;
-    const headerNames = headers.map(h => (h.innerText ?? '').trim().toLowerCase());
+    const headerNames = [];
+    const headerMap = {}
+    headers.forEach((h, i) => {
+        const name = (h.innerText ?? '').trim().toLowerCase();
+        headerMap[name] = i;
+        headerNames.push(name);
+        h.dataset.col = i;
+    });
     for (const header of headers) {
         const text = header.innerText ?? '';
         const m = text.match(/\(\(\=(.*)\)\)/);
@@ -157,7 +176,7 @@ function prepareTable (table) {
             // Этой штукой мы конветим формулу в JS-выражение.
             const formula = m[1].trim().replace(/\[(.*?)\]/g, function (_, name) {
                 name = name.trim().toLowerCase();
-                const i = headerNames.findIndex(hname => (hname ?? '').startsWith(name));
+                const i = headerMap[name] ?? headerNames.findIndex(hname => (hname ?? '').startsWith(name));
                 return `valueRc(row, ${i})`;
             });
             formulas.push({
