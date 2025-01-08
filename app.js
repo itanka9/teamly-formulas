@@ -24,7 +24,6 @@ function mainLoop() {
         if (tables.has(t)) {
             return;
         }
-        console.log('prepare table');
         tables.set(t, prepareTable(t));        
     });
 
@@ -58,7 +57,6 @@ function mainLoop() {
         if (articleProperties.has(ap)) {
             return;
         }
-        console.log('prepare article props');
         articleProperties.set(ap, prepareArticleProperties(ap));
     });
 
@@ -83,26 +81,29 @@ function mainLoop() {
             const rows = Array.from(tableContent.querySelectorAll('.row'));
             const cells = Array.from(rows).map(row => Array.from(row.querySelectorAll('.table-cell')));
     
-            function valueRc(row, rawCol) {
-                const col = columnMap[rawCol];
-                const cell = cells[row][col];
-                if (!cell) {
-                    return NaN;
-                }
-                const checkbox = cell.querySelector('.checkbox');
-                if (checkbox) {
-                    return checkbox.querySelector('.checked') ? 1 : 0;
-                } else  {
-                    const v = (cells[row][col].innerText ?? '')
-                        .replace(/\s+/g, '')
-                        .replace(',', '.');
-                    if (isNaN(v)) {
-                        return v;
+            const ctx = {
+                cell: (row, rawCol) => {
+                    const col = columnMap[rawCol];
+                    const cell = cells[row][col];
+                    if (!cell) {
+                        return NaN;
                     }
-                    return Number(v);
+                    const checkbox = cell.querySelector('.checkbox');
+                    if (checkbox) {
+                        return checkbox.querySelector('.checked') ? 1 : 0;
+                    } else  {
+                        const v = (cells[row][col].innerText ?? '')
+                            .replace(/\D+/g, '')
+                            .replace(',', '.');
+                        if (isNaN(v)) {
+                            console.log('nan value', v, col, cell);
+                            return v;
+                        }
+                        return Number(v);
+                    }
                 }
-            }
-
+            };
+            
             formulas.forEach(({ title, col, formula, hasSum, headerOnly }) => {
                 col = columnMap[col];
                 let sum = 0;
@@ -114,13 +115,12 @@ function mainLoop() {
                     try {
                         /**
                          * При инициализации таблицы формула при помощи
-                         * простейших манипуляций конвертируется в JS-выражение.
+                         * простейших манипуляций конвертируется в JS-функцию.
                          * 
-                         * Тут мы его просто вычисляем. 
-                         * 
-                         * Использование eval() - это всегда грязь, но зато быстро 
+                         * Тут мы ее просто вызываем. 
                          */
-                        let result = eval(formula);
+                        ctx.row = row;
+                        let result = formula(ctx);
                         if (!isNaN(result)) {
                             sum += Number(result);
                             result = result.toFixed(2).replace('.00', '');
@@ -130,6 +130,8 @@ function mainLoop() {
                         }
                         if (result === undefined) {
                             cell.innerText = '-'
+                        } else if (typeof result === 'string' && result[0] === '<') {
+                            cell.innerHTML = result;
                         } else {
                             cell.innerText = result;
                         }
@@ -173,17 +175,25 @@ function prepareTable (table) {
         const hasSum = text.match(/#SUM#/) || firstRowCell?.classList.contains('database-number');
         const preciseHeader = header.children[0] instanceof HTMLElement ? header.children[0] : header; 
         if (m && m[1]) {
+            const missingCells = [];
             // Этой штукой мы конветим формулу в JS-выражение.
-            const formula = m[1].trim().replace(/\[(.*?)\]/g, function (_, name) {
-                name = name.trim().toLowerCase();
+            let formula = m[1].trim().replace(/\[(.*?)\]/g, function (_, rawName) {
+                const name = rawName.trim().toLowerCase();
                 const i = headerMap[name] ?? headerNames.findIndex(hname => (hname ?? '').startsWith(name));
-                return `valueRc(row, ${i})`;
+                if (i === -1) {
+                    missingCells.push(rawName);
+                    return `NaN`;
+                }
+                return `ctx.cell(ctx.row, ${i})`;
             });
+            if (missingCells.length > 0) {
+                formula = `'<strong title="Не найдены ячейки: ${missingCells.map(c => `<<${c}>>`).join(', ')}">#ERR</strong>'`;
+            }
             formulas.push({
                 header: preciseHeader,
                 title: text.slice(0, m.index),
                 col: column,
-                formula,
+                formula: new Function('ctx', `return ${formula};`),
                 hasSum
             });
         } else if (hasSum) {
@@ -191,7 +201,7 @@ function prepareTable (table) {
                 header: preciseHeader,
                 title: text,
                 col: column,
-                formula: `valueRc(row, ${column})`,
+                formula: new Function('ctx', `return ctx.cell(ctx.row, ${column});`),
                 hasSum,
                 headerOnly: true
             });
