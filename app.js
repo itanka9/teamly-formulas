@@ -217,7 +217,7 @@ function prepareTable (table) {
 }
 
 function prepareFields(fieldsEl) {
-    const titleEl = fieldsEl.parentElement.previousElementSibling; // .querySelector('.visible-fields__title');
+    const titleEl = fieldsEl.parentElement.querySelector('.nested-structure__header');
 
     titleEl.style.display = 'flex';
     titleEl.style.alignItems = 'center';
